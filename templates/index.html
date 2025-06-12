@@ -1,0 +1,647 @@
+ 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IzyVote - Votación Segura con Blockchain</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            animation: slideIn 0.8s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #51a3a3, #759d9d);
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .candidates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .candidate-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .candidate-card:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .candidate-card.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .candidate-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .results-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .result-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            transition: width 0.8s ease;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .vote-code {
+            background: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 1rem 0;
+        }
+
+        .blockchain-info {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.7);
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+                margin: 1rem;
+            }
+            
+            .candidates-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tab-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🗳️ IzyVote</div>
+            <div class="subtitle">Sistema de Votación Segura con Blockchain</div>
+        </div>
+
+        <div class="tab-buttons">
+            <div class="tab-btn active" onclick="showTab('vote')">Votar</div>
+            <div class="tab-btn" onclick="showTab('status')">Estado del Voto</div>
+            <div class="tab-btn" onclick="showTab('results')">Resultados</div>
+        </div>
+
+        <!-- Sección de Votación -->
+        <div id="vote-section" class="section">
+            <h2>🗳️ Emitir Voto</h2>
+            <div id="vote-messages"></div>
+            
+            <div class="input-group">
+                <label for="dni">DNI (7 dígitos):</label>
+                <input type="text" id="dni" placeholder="Ej: 1234567" maxlength="7" pattern="[0-9]{7}">
+            </div>
+
+            <div class="input-group">
+                <label>Selecciona tu candidato:</label>
+                <div class="candidates-grid">
+                    <div class="candidate-card" onclick="selectCandidate('Juan Pérez', this)">
+                        <div class="candidate-avatar">JP</div>
+                        <div><strong>Juan Pérez</strong></div>
+                        <div>Partido Azul</div>
+                    </div>
+                    <div class="candidate-card" onclick="selectCandidate('María García', this)">
+                        <div class="candidate-avatar">MG</div>
+                        <div><strong>María García</strong></div>
+                        <div>Partido Verde</div>
+                    </div>
+                    <div class="candidate-card" onclick="selectCandidate('Roberto Silva', this)">
+                        <div class="candidate-avatar">RS</div>
+                        <div><strong>Roberto Silva</strong></div>
+                        <div>Partido Rojo</div>
+                    </div>
+                    <div class="candidate-card" onclick="selectCandidate('Ana López', this)">
+                        <div class="candidate-avatar">AL</div>
+                        <div><strong>Ana López</strong></div>
+                        <div>Partido Amarillo</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn" onclick="submitVote()" id="vote-btn">
+                Emitir Voto Seguro
+            </button>
+        </div>
+
+        <!-- Sección de Estado del Voto -->
+        <div id="status-section" class="section hidden">
+            <h2>📊 Consultar Estado del Voto</h2>
+            <div id="status-messages"></div>
+            
+            <div class="input-group">
+                <label for="status-dni">DNI (7 dígitos):</label>
+                <input type="text" id="status-dni" placeholder="Ej: 1234567" maxlength="7" pattern="[0-9]{7}">
+            </div>
+
+            <button class="btn btn-secondary" onclick="checkVoteStatus()">
+                Verificar Estado
+            </button>
+        </div>
+
+        <!-- Sección de Resultados -->
+        <div id="results-section" class="section hidden">
+            <h2>📈 Resultados en Tiempo Real</h2>
+            <div id="results-messages"></div>
+            
+            <div id="results-container">
+                <div class="alert-info">
+                    <strong>Cargando resultados...</strong>
+                </div>
+            </div>
+
+            <button class="btn btn-secondary" onclick="loadResults()">
+                Actualizar Resultados
+            </button>
+
+            <div class="blockchain-info">
+                <strong>🔗 Información del Blockchain:</strong>
+                <div id="blockchain-stats">Cargando estadísticas...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedCandidate = null;
+        const API_BASE = 'http://localhost:5000'; // Cambia esto por tu URL de producción
+
+        // Función para mostrar pestañas
+        function showTab(tabName) {
+            // Ocultar todas las secciones
+            document.getElementById('vote-section').classList.add('hidden');
+            document.getElementById('status-section').classList.add('hidden');
+            document.getElementById('results-section').classList.add('hidden');
+
+            // Mostrar la sección seleccionada
+            document.getElementById(tabName + '-section').classList.remove('hidden');
+
+            // Actualizar botones activos
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Cargar datos específicos de la pestaña
+            if (tabName === 'results') {
+                loadResults();
+            }
+        }
+
+        // Función para seleccionar candidato
+        function selectCandidate(candidate, element) {
+            selectedCandidate = candidate;
+            
+            // Remover selección anterior
+            document.querySelectorAll('.candidate-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            // Agregar selección actual
+            element.classList.add('selected');
+        }
+
+        // Función para emitir voto
+        async function submitVote() {
+            const dni = document.getElementById('dni').value.trim();
+            const messagesDiv = document.getElementById('vote-messages');
+            const voteBtn = document.getElementById('vote-btn');
+
+            // Validaciones
+            if (!dni || dni.length !== 7 || !/^\d{7}$/.test(dni)) {
+                showMessage(messagesDiv, 'Por favor ingresa un DNI válido de 7 dígitos.', 'error');
+                return;
+            }
+
+            if (!selectedCandidate) {
+                showMessage(messagesDiv, 'Por favor selecciona un candidato.', 'error');
+                return;
+            }
+
+            // Mostrar loading
+            voteBtn.innerHTML = '<span class="loading"></span>Procesando voto...';
+            voteBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        votante_id: dni,
+                        candidato: selectedCandidate
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Minar el bloque después del voto
+                    await mineBlock();
+                    
+                    // Generar código único del voto
+                    const voteCode = generateVoteCode(dni, selectedCandidate);
+                    
+                    showMessage(messagesDiv, 
+                        `¡Voto registrado exitosamente!<div class="vote-code">Código de votación: ${voteCode}</div>
+                        <div class="blockchain-info">Tu voto ha sido registrado de forma segura en la blockchain. Guarda este código para futuras consultas.</div>`, 
+                        'success'
+                    );
+                    
+                    // Limpiar formulario
+                    document.getElementById('dni').value = '';
+                    selectedCandidate = null;
+                    document.querySelectorAll('.candidate-card').forEach(card => {
+                        card.classList.remove('selected');
+                    });
+                } else {
+                    showMessage(messagesDiv, data.mensaje || 'Error al procesar el voto', 'error');
+                }
+            } catch (error) {
+                showMessage(messagesDiv, 'Error de conexión. Verifica que el servidor esté funcionando.', 'error');
+                console.error('Error:', error);
+            } finally {
+                voteBtn.innerHTML = 'Emitir Voto Seguro';
+                voteBtn.disabled = false;
+            }
+        }
+
+        // Función para minar bloque
+        async function mineBlock() {
+            try {
+                await fetch(`${API_BASE}/mine`, {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Error al minar bloque:', error);
+            }
+        }
+
+        // Función para verificar estado del voto
+        async function checkVoteStatus() {
+            const dni = document.getElementById('status-dni').value.trim();
+            const messagesDiv = document.getElementById('status-messages');
+
+            if (!dni || dni.length !== 7 || !/^\d{7}$/.test(dni)) {
+                showMessage(messagesDiv, 'Por favor ingresa un DNI válido de 7 dígitos.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/chain`);
+                const chain = await response.json();
+
+                let voteFound = null;
+                let blockIndex = null;
+
+                // Buscar el voto en la blockchain
+                for (let i = 0; i < chain.length; i++) {
+                    const block = chain[i];
+                    for (let vote of block.votos) {
+                        if (vote.votante_id === dni) {
+                            voteFound = vote;
+                            blockIndex = block.indice;
+                            break;
+                        }
+                    }
+                    if (voteFound) break;
+                }
+
+                if (voteFound) {
+                    const voteCode = generateVoteCode(dni, voteFound.candidato);
+                    showMessage(messagesDiv, 
+                        `✅ <strong>Estado del voto:</strong> REGISTRADO<br>
+                        <strong>Candidato votado:</strong> ${voteFound.candidato}<br>
+                        <strong>Bloque:</strong> #${blockIndex}<br>
+                        <div class="vote-code">Código de verificación: ${voteCode}</div>`, 
+                        'success'
+                    );
+                } else {
+                    showMessage(messagesDiv, 'No se encontró ningún voto registrado con este DNI.', 'info');
+                }
+            } catch (error) {
+                showMessage(messagesDiv, 'Error al consultar el estado del voto.', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Función para cargar resultados
+        async function loadResults() {
+            const messagesDiv = document.getElementById('results-messages');
+            const resultsContainer = document.getElementById('results-container');
+            const blockchainStats = document.getElementById('blockchain-stats');
+
+            try {
+                const response = await fetch(`${API_BASE}/chain`);
+                const chain = await response.json();
+
+                // Contar votos
+                const results = {};
+                let totalVotes = 0;
+
+                chain.forEach(block => {
+                    block.votos.forEach(vote => {
+                        results[vote.candidato] = (results[vote.candidato] || 0) + 1;
+                        totalVotes++;
+                    });
+                });
+
+                // Mostrar resultados
+                if (totalVotes === 0) {
+                    resultsContainer.innerHTML = '<div class="alert-info">Aún no hay votos registrados.</div>';
+                } else {
+                    let html = '<div class="results-grid">';
+                    
+                    Object.entries(results)
+                        .sort(([,a], [,b]) => b - a)
+                        .forEach(([candidate, votes]) => {
+                            const percentage = ((votes / totalVotes) * 100).toFixed(1);
+                            html += `
+                                <div class="result-item">
+                                    <div>
+                                        <strong>${candidate}</strong><br>
+                                        <span>${votes} votos (${percentage}%)</span>
+                                        <div class="result-bar">
+                                            <div class="result-fill" style="width: ${percentage}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    
+                    html += '</div>';
+                    resultsContainer.innerHTML = html;
+                }
+
+                // Estadísticas del blockchain
+                const lastBlock = chain[chain.length - 1];
+                blockchainStats.innerHTML = `
+                    <strong>Total de bloques:</strong> ${chain.length}<br>
+                    <strong>Total de votos:</strong> ${totalVotes}<br>
+                    <strong>Último bloque:</strong> #${lastBlock.indice}<br>
+                    <strong>Hash del último bloque:</strong> ${lastBlock.hash.substring(0, 16)}...
+                `;
+
+            } catch (error) {
+                showMessage(messagesDiv, 'Error al cargar los resultados.', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Función para generar código único de voto
+        function generateVoteCode(dni, candidate) {
+            const timestamp = Date.now().toString();
+            const combined = dni + candidate + timestamp;
+            return 'IZY' + btoa(combined).substring(0, 8).toUpperCase();
+        }
+
+        // Función para mostrar mensajes
+        function showMessage(container, message, type) {
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 10000);
+        }
+
+        // Cargar resultados al iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadResults();
+        });
+
+        // Auto-refresh de resultados cada 30 segundos
+        setInterval(() => {
+            if (!document.getElementById('results-section').classList.contains('hidden')) {
+                loadResults();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
