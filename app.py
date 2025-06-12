@@ -272,7 +272,18 @@ def check_vote_status(dni):
     try:
         if not dni.isdigit() or len(dni) != 7:
             return jsonify({'mensaje': 'DNI inválido'}), 400
+        # Buscar en votos pendientes primero
+        for voto in blockchain.votos_pendientes:
+            if voto.votante_id == dni:
+                return jsonify({
+                    'ya_voto': True,
+                    'candidato': voto.candidato,
+                    'bloque_indice': 'pendiente',
+                    'timestamp': voto.timestamp,
+                    'estado': 'Voto registrado pero aún no minado'
+                })
         
+        # Buscar en la cadena de bloque
         resultado = blockchain.buscar_voto_por_dni(dni)
         
         if resultado:
