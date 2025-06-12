@@ -1,4 +1,3 @@
- 
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -162,9 +161,10 @@
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
+            outline: none;
         }
 
-        .candidate-card:hover {
+        .candidate-card:hover, .candidate-card:focus {
             border-color: #667eea;
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -326,22 +326,22 @@
             <div class="input-group">
                 <label>Selecciona tu candidato:</label>
                 <div class="candidates-grid">
-                    <div class="candidate-card" onclick="selectCandidate('Juan Pérez', this)">
+                    <div class="candidate-card" onclick="selectCandidate('Juan Pérez', this)" tabindex="0">
                         <div class="candidate-avatar">JP</div>
                         <div><strong>Juan Pérez</strong></div>
                         <div>Partido Azul</div>
                     </div>
-                    <div class="candidate-card" onclick="selectCandidate('María García', this)">
+                    <div class="candidate-card" onclick="selectCandidate('María García', this)" tabindex="0">
                         <div class="candidate-avatar">MG</div>
                         <div><strong>María García</strong></div>
                         <div>Partido Verde</div>
                     </div>
-                    <div class="candidate-card" onclick="selectCandidate('Roberto Silva', this)">
+                    <div class="candidate-card" onclick="selectCandidate('Roberto Silva', this)" tabindex="0">
                         <div class="candidate-avatar">RS</div>
                         <div><strong>Roberto Silva</strong></div>
                         <div>Partido Rojo</div>
                     </div>
-                    <div class="candidate-card" onclick="selectCandidate('Ana López', this)">
+                    <div class="candidate-card" onclick="selectCandidate('Ana López', this)" tabindex="0">
                         <div class="candidate-avatar">AL</div>
                         <div><strong>Ana López</strong></div>
                         <div>Partido Amarillo</div>
@@ -422,10 +422,13 @@
             // Remover selección anterior
             document.querySelectorAll('.candidate-card').forEach(card => {
                 card.classList.remove('selected');
+                card.setAttribute('aria-selected', 'false');
             });
             
             // Agregar selección actual
             element.classList.add('selected');
+            element.setAttribute('aria-selected', 'true');
+            element.focus();
         }
 
         // Función para emitir voto
@@ -516,39 +519,31 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/chain`);
-                const chain = await response.json();
+                const response = await fetch(`${API_BASE}/status/${dni}`);
+                const data = await response.json();
 
-                let voteFound = null;
-                let blockIndex = null;
-
-                // Buscar el voto en la blockchain
-                for (let i = 0; i < chain.length; i++) {
-                    const block = chain[i];
-                    for (let vote of block.votos) {
-                        if (vote.votante_id === dni) {
-                            voteFound = vote;
-                            blockIndex = block.indice;
-                            break;
-                        }
-                    }
-                    if (voteFound) break;
+                if (!response.ok) {
+                    throw new Error(data.mensaje || 'Error al verificar el voto');
                 }
 
-                if (voteFound) {
-                    const voteCode = generateVoteCode(dni, voteFound.candidato);
+                if (data.ya_voto) {
+                    const voteCode = generateVoteCode(dni, data.candidato);
+                    const estado = data.estado || 'Voto registrado';
+                    const bloqueInfo = data.bloque_indice === 'pendiente' ? 
+                        '(pendiente de minado)' : `#${data.bloque_indice}`;
+                    
                     showMessage(messagesDiv, 
-                        `✅ <strong>Estado del voto:</strong> REGISTRADO<br>
-                        <strong>Candidato votado:</strong> ${voteFound.candidato}<br>
-                        <strong>Bloque:</strong> #${blockIndex}<br>
+                        `✅ <strong>Estado del voto:</strong> ${estado}<br>
+                        <strong>Candidato votado:</strong> ${data.candidato}<br>
+                        <strong>Bloque:</strong> ${bloqueInfo}<br>
                         <div class="vote-code">Código de verificación: ${voteCode}</div>`, 
                         'success'
                     );
                 } else {
-                    showMessage(messagesDiv, 'No se encontró ningún voto registrado con este DNI.', 'info');
+                    showMessage(messagesDiv, data.mensaje || 'No se encontró ningún voto registrado con este DNI.', 'info');
                 }
             } catch (error) {
-                showMessage(messagesDiv, 'Error al consultar el estado del voto.', 'error');
+                showMessage(messagesDiv, `Error al consultar el estado del voto: ${error.message}`, 'error');
                 console.error('Error:', error);
             }
         }
@@ -560,30 +555,26 @@
             const blockchainStats = document.getElementById('blockchain-stats');
 
             try {
-                const response = await fetch(`${API_BASE}/chain`);
-                const chain = await response.json();
+                // Primero obtener los resultados consolidados
+                const resultsResponse = await fetch(`${API_BASE}/results`);
+                if (!resultsResponse.ok) throw new Error('Error al obtener resultados');
+                const resultsData = await resultsResponse.json();
 
-                // Contar votos
-                const results = {};
-                let totalVotes = 0;
-
-                chain.forEach(block => {
-                    block.votos.forEach(vote => {
-                        results[vote.candidato] = (results[vote.candidato] || 0) + 1;
-                        totalVotes++;
-                    });
-                });
+                // Luego obtener la cadena completa para estadísticas
+                const chainResponse = await fetch(`${API_BASE}/chain`);
+                if (!chainResponse.ok) throw new Error('Error al obtener cadena');
+                const chainData = await chainResponse.json();
 
                 // Mostrar resultados
-                if (totalVotes === 0) {
+                if (resultsData.total_votos === 0) {
                     resultsContainer.innerHTML = '<div class="alert-info">Aún no hay votos registrados.</div>';
                 } else {
                     let html = '<div class="results-grid">';
                     
-                    Object.entries(results)
+                    Object.entries(resultsData.resultados)
                         .sort(([,a], [,b]) => b - a)
                         .forEach(([candidate, votes]) => {
-                            const percentage = ((votes / totalVotes) * 100).toFixed(1);
+                            const percentage = ((votes / resultsData.total_votos) * 100).toFixed(1);
                             html += `
                                 <div class="result-item">
                                     <div>
@@ -602,16 +593,17 @@
                 }
 
                 // Estadísticas del blockchain
-                const lastBlock = chain[chain.length - 1];
+                const lastBlock = chainData.cadena[chainData.cadena.length - 1];
                 blockchainStats.innerHTML = `
-                    <strong>Total de bloques:</strong> ${chain.length}<br>
-                    <strong>Total de votos:</strong> ${totalVotes}<br>
+                    <strong>Total de bloques:</strong> ${chainData.longitud}<br>
+                    <strong>Total de votos:</strong> ${resultsData.total_votos}<br>
+                    <strong>Votos pendientes:</strong> ${resultsData.votos_pendientes}<br>
                     <strong>Último bloque:</strong> #${lastBlock.indice}<br>
                     <strong>Hash del último bloque:</strong> ${lastBlock.hash.substring(0, 16)}...
                 `;
 
             } catch (error) {
-                showMessage(messagesDiv, 'Error al cargar los resultados.', 'error');
+                showMessage(messagesDiv, `Error al cargar los resultados: ${error.message}`, 'error');
                 console.error('Error:', error);
             }
         }
@@ -633,6 +625,17 @@
 
         // Cargar resultados al iniciar
         document.addEventListener('DOMContentLoaded', function() {
+            // Permitir selección con teclado
+            document.querySelectorAll('.candidate-card').forEach(card => {
+                card.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const candidate = this.querySelector('strong').textContent;
+                        selectCandidate(candidate, this);
+                    }
+                });
+            });
+
             loadResults();
         });
 
