@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IzyVote - Votación Segura con Blockchain</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -189,9 +190,16 @@
             font-weight: bold;
         }
 
-        .results-grid {
+        .results-container {
             display: grid;
+            grid-template-columns: 1fr;
             gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .results-container {
+                grid-template-columns: 1fr 1fr;
+            }
         }
 
         .result-item {
@@ -284,6 +292,19 @@
             border-color: #667eea;
         }
 
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+        }
+
+        .no-votes-message {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 1.1rem;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 1rem;
@@ -296,6 +317,10 @@
             
             .tab-buttons {
                 flex-direction: column;
+            }
+
+            .results-container {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -374,9 +399,16 @@
             <h2>📈 Resultados en Tiempo Real</h2>
             <div id="results-messages"></div>
             
-            <div id="results-container">
-                <div class="alert-info">
-                    <strong>Cargando resultados...</strong>
+            <div class="results-container">
+                <div>
+                    <div class="chart-container">
+                        <canvas id="results-chart"></canvas>
+                    </div>
+                </div>
+                <div id="results-list">
+                    <div class="no-votes-message">
+                        No hay votos registrados todavía
+                    </div>
                 </div>
             </div>
 
@@ -393,7 +425,9 @@
 
     <script>
         let selectedCandidate = null;
+        let resultsChart = null;
         const API_BASE = 'http://localhost:5000'; // Cambia esto por tu URL de producción
+        const CANDIDATOS = ['Juan Pérez', 'María García', 'Roberto Silva', 'Ana López'];
 
         // Función para mostrar pestañas
         function showTab(tabName) {
@@ -406,7 +440,9 @@
             document.getElementById(tabName + '-section').classList.remove('hidden');
 
             // Actualizar botones activos
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
             event.target.classList.add('active');
 
             // Cargar datos específicos de la pestaña
@@ -485,6 +521,11 @@
                     document.querySelectorAll('.candidate-card').forEach(card => {
                         card.classList.remove('selected');
                     });
+
+                    // Actualizar resultados si estamos en esa pestaña
+                    if (!document.getElementById('results-section').classList.contains('hidden')) {
+                        loadResults();
+                    }
                 } else {
                     showMessage(messagesDiv, data.mensaje || 'Error al procesar el voto', 'error');
                 }
@@ -551,61 +592,133 @@
         // Función para cargar resultados
         async function loadResults() {
             const messagesDiv = document.getElementById('results-messages');
-            const resultsContainer = document.getElementById('results-container');
+            const resultsList = document.getElementById('results-list');
             const blockchainStats = document.getElementById('blockchain-stats');
 
             try {
-                // Primero obtener los resultados consolidados
-                const resultsResponse = await fetch(`${API_BASE}/results`);
-                if (!resultsResponse.ok) throw new Error('Error al obtener resultados');
-                const resultsData = await resultsResponse.json();
-
-                // Luego obtener la cadena completa para estadísticas
-                const chainResponse = await fetch(`${API_BASE}/chain`);
-                if (!chainResponse.ok) throw new Error('Error al obtener cadena');
-                const chainData = await chainResponse.json();
+                // Obtener resultados
+                const response = await fetch(`${API_BASE}/results`);
+                if (!response.ok) throw new Error('Error al obtener resultados');
+                const data = await response.json();
 
                 // Mostrar resultados
-                if (resultsData.total_votos === 0) {
-                    resultsContainer.innerHTML = '<div class="alert-info">Aún no hay votos registrados.</div>';
+                if (data.total_votos === 0) {
+                    resultsList.innerHTML = '<div class="no-votes-message">No hay votos registrados todavía</div>';
                 } else {
+                    // Ordenar resultados por cantidad de votos
+                    const sortedResults = Object.entries(data.resultados)
+                        .sort(([,a], [,b]) => b - a);
+
                     let html = '<div class="results-grid">';
                     
-                    Object.entries(resultsData.resultados)
-                        .sort(([,a], [,b]) => b - a)
-                        .forEach(([candidate, votes]) => {
-                            const percentage = ((votes / resultsData.total_votos) * 100).toFixed(1);
-                            html += `
-                                <div class="result-item">
-                                    <div>
-                                        <strong>${candidate}</strong><br>
-                                        <span>${votes} votos (${percentage}%)</span>
-                                        <div class="result-bar">
-                                            <div class="result-fill" style="width: ${percentage}%"></div>
-                                        </div>
+                    sortedResults.forEach(([candidate, votes]) => {
+                        const percentage = ((votes / data.total_votos) * 100).toFixed(1);
+                        html += `
+                            <div class="result-item">
+                                <div>
+                                    <strong>${candidate}</strong><br>
+                                    <span>${votes} votos (${percentage}%)</span>
+                                    <div class="result-bar">
+                                        <div class="result-fill" style="width: ${percentage}%"></div>
                                     </div>
                                 </div>
-                            `;
-                        });
+                            </div>
+                        `;
+                    });
                     
                     html += '</div>';
-                    resultsContainer.innerHTML = html;
+                    resultsList.innerHTML = html;
                 }
 
+                // Actualizar gráfico con todos los candidatos (incluso los que tienen 0 votos)
+                updateChart(data.resultados, data.total_votos);
+
                 // Estadísticas del blockchain
-                const lastBlock = chainData.cadena[chainData.cadena.length - 1];
                 blockchainStats.innerHTML = `
-                    <strong>Total de bloques:</strong> ${chainData.longitud}<br>
-                    <strong>Total de votos:</strong> ${resultsData.total_votos}<br>
-                    <strong>Votos pendientes:</strong> ${resultsData.votos_pendientes}<br>
-                    <strong>Último bloque:</strong> #${lastBlock.indice}<br>
-                    <strong>Hash del último bloque:</strong> ${lastBlock.hash.substring(0, 16)}...
+                    <strong>Total de bloques:</strong> ${data.stats.total_bloques}<br>
+                    <strong>Total de votos:</strong> ${data.stats.total_votos}<br>
+                    <strong>Votos pendientes:</strong> ${data.stats.votos_pendientes}<br>
+                    <strong>Último bloque:</strong> #${data.stats.ultimo_bloque}<br>
+                    <strong>Hash del último bloque:</strong> ${data.stats.ultimo_hash.substring(0, 16)}...
                 `;
 
             } catch (error) {
                 showMessage(messagesDiv, `Error al cargar los resultados: ${error.message}`, 'error');
                 console.error('Error:', error);
             }
+        }
+
+        // Función para actualizar el gráfico de torta
+        function updateChart(resultsData, totalVotes) {
+            const ctx = document.getElementById('results-chart').getContext('2d');
+            
+            // Destruir el gráfico anterior si existe
+            if (resultsChart) {
+                resultsChart.destroy();
+            }
+            
+            // Colores para el gráfico
+            const backgroundColors = [
+                'rgba(102, 126, 234, 0.7)',  // Juan Pérez
+                'rgba(118, 75, 162, 0.7)',   // María García
+                'rgba(255, 99, 132, 0.7)',   // Roberto Silva
+                'rgba(54, 162, 235, 0.7)'    // Ana López
+            ];
+
+            const borderColors = [
+                'rgba(102, 126, 234, 1)',
+                'rgba(118, 75, 162, 1)',
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)'
+            ];
+
+            // Preparar datos para el gráfico (incluyendo candidatos con 0 votos)
+            const labels = CANDIDATOS;
+            const data = CANDIDATOS.map(candidate => resultsData[candidate] || 0);
+            const percentages = CANDIDATOS.map(candidate => {
+                const votes = resultsData[candidate] || 0;
+                return totalVotes > 0 ? ((votes / totalVotes) * 100).toFixed(1) : 0;
+            });
+
+            // Crear el gráfico
+            resultsChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels.map((label, i) => `${label} (${percentages[i]}%)`),
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const percentage = totalVotes > 0 ? ((value / totalVotes) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} votos (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const candidate = labels[index];
+                            alert(`Has seleccionado: ${candidate}\nVotos: ${data[index]} (${percentages[index]}%)`);
+                        }
+                    }
+                }
+            });
         }
 
         // Función para generar código único de voto
@@ -623,7 +736,7 @@
             }, 10000);
         }
 
-        // Cargar resultados al iniciar
+        // Inicializar gráfico al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
             // Permitir selección con teclado
             document.querySelectorAll('.candidate-card').forEach(card => {
@@ -636,7 +749,46 @@
                 });
             });
 
-            loadResults();
+            // Inicializar gráfico vacío
+            const ctx = document.getElementById('results-chart').getContext('2d');
+            resultsChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: CANDIDATOS,
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.7)',
+                            'rgba(118, 75, 162, 0.7)',
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: 0 votos (0%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         });
 
         // Auto-refresh de resultados cada 30 segundos
