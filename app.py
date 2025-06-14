@@ -1,10 +1,10 @@
- 
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, render_template
 from flask_cors import CORS
 import hashlib
 import json
 import time
 import os
+from collections import defaultdict
 
 # ---- Clases de Blockchain ----
 class Voto:
@@ -88,12 +88,11 @@ class BlockchainVotos:
         return nuevo_bloque
 
     def contar_votos(self):
-        resultados = {}
+        resultados = defaultdict(int)
         for bloque in self.cadena:
             for voto in bloque.votos:
-                can = voto.candidato
-                resultados[can] = resultados.get(can, 0) + 1
-        return resultados
+                resultados[voto.candidato] += 1
+        return dict(resultados)
 
     def buscar_voto_por_dni(self, dni):
         """Busca si un DNI ya votó y devuelve información del voto"""
@@ -108,65 +107,25 @@ class BlockchainVotos:
                     }
         return None
 
+    def get_stats(self):
+        """Obtiene estadísticas generales de la blockchain"""
+        total_votos = sum(len(bloque.votos) for bloque in self.cadena)
+        return {
+            'total_bloques': len(self.cadena),
+            'total_votos': total_votos,
+            'votos_pendientes': len(self.votos_pendientes),
+            'ultimo_bloque': self.cadena[-1].indice if self.cadena else 0,
+            'ultimo_hash': self.cadena[-1].hash if self.cadena else '0'
+        }
+
 # ---- Aplicación Flask ----
 app = Flask(__name__)
 CORS(app, origins="*")  # Permitir todos los orígenes para desarrollo
 blockchain = BlockchainVotos()
 
-# HTML template integrado (para cuando no hay carpeta templates)
-HTML_TEMPLATE = '''
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IzyVote - Sistema cargando...</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            text-align: center; 
-            padding: 50px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .loading { font-size: 2rem; margin: 2rem 0; }
-        .info { background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 10px; margin: 2rem 0; }
-    </style>
-</head>
-<body>
-    <div class="loading">🗳️ IzyVote</div>
-    <div class="info">
-        <h2>Sistema de Votación con Blockchain</h2>
-        <p>Si ves este mensaje, el servidor está funcionando correctamente.</p>
-        <p>El frontend debe cargarse automáticamente.</p>
-        <p><strong>Puerto:</strong> {{ port }}</p>
-        <p><strong>Estado:</strong> ✅ Activo</p>
-    </div>
-    <script>
-        // Redirigir automáticamente si hay un archivo HTML
-        setTimeout(() => {
-            if (window.location.pathname === '/') {
-                window.location.reload();
-            }
-        }, 2000);
-    </script>
-</body>
-</html>
-'''
-
 @app.route('/')
 def home():
-    try:
-        # Intentar cargar el archivo HTML desde templates
-        if os.path.exists('templates/index.html'):
-            with open('templates/index.html', 'r', encoding='utf-8') as file:
-                return file.read()
-        else:
-            # Si no existe templates, mostrar página de estado
-            port = request.environ.get('SERVER_PORT', '5000')
-            return render_template_string(HTML_TEMPLATE, port=port)
-    except Exception as e:
-        return f"Error cargando la página: {str(e)}", 500
+    return render_template('index.html')
 
 @app.route('/vote', methods=['POST'])
 def vote():
@@ -314,7 +273,8 @@ def get_results():
             'resultados': resultados,
             'total_votos': total_votos,
             'bloques_total': len(blockchain.cadena),
-            'votos_pendientes': len(blockchain.votos_pendientes)
+            'votos_pendientes': len(blockchain.votos_pendientes),
+            'stats': blockchain.get_stats()
         })
     except Exception as e:
         print(f"❌ Error en /results: {str(e)}")
@@ -341,39 +301,17 @@ def not_found(error):
 def internal_error(error):
     return jsonify({'error': 'Error interno del servidor'}), 500
 
-# ---- Inicialización y demostración ----
-def inicializar_datos_demo():
-    """Crear algunos votos de ejemplo para demostración"""
+# ---- Inicialización ----
+def inicializar_sistema():
+    """Inicialización del sistema sin votos de demostración"""
     print('\n🚀 === Inicializando IzyVote ===')
-    print('📊 Agregando votos de demostración...')
-    
-    votos_demo = [
-        ('1234567', 'Juan Pérez'),
-        ('2345678', 'María García'),
-        ('3456789', 'Roberto Silva'),
-        ('4567890', 'Ana López'),
-        ('5678901', 'Juan Pérez')  # Segundo voto para Juan
-    ]
-    
-    for dni, candidato in votos_demo:
-        blockchain.agregar_voto(dni, candidato)
-    
-    # Minar los votos
-    bloque = blockchain.minar_votos_pendientes()
-    if bloque:
-        print(f'⛏️ Bloque demo minado: #{bloque.indice}')
-    
-    resultados = blockchain.contar_votos()
-    print('\n📈 === Resultados Iniciales ===')
-    for candidato, votos in resultados.items():
-        print(f'🗳️ {candidato}: {votos} votos')
-    
+    print('📊 Sistema iniciado sin votos de demostración...')
     print(f'\n✅ Sistema listo con {len(blockchain.cadena)} bloques')
     print('=' * 50)
 
 if __name__ == '__main__':
-    # Inicializar datos de demostración
-    inicializar_datos_demo()
+    # Inicializar sistema vacío
+    inicializar_sistema()
     
     # Determinar configuración según el entorno
     port = int(os.environ.get('PORT', 5000))
